@@ -1,1 +1,13 @@
-{}
+{
+  "votes": {
+    "https://spovotes.com/votes/change-min-fixed-fee-to-variable/": {
+      "vote": "Yes"
+    },
+    "https://spovotes.com/votes/reduce-min-fee/": {
+      "vote": "No"
+    },
+    "https://spovotes.com/votes/remove-min-fee/": {
+      "vote": "No"
+    }
+  }
+}
