@@ -3,17 +3,37 @@
 
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="mini-nord.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhillyStake</title>
 </head>
 
 <body>
-  <h1>PhillyStake</h1>
+  <header>
+    <label for="drawer-control" class="drawer-toggle"></label>
+    <a href="#" class="logo">PhillyStake</a>
+  </header>
 
-  <p>
-    PhillyStake is an organization of software developers providing value to Web3 networks and delegators.
-  </p>
-
-  <p>More content (and a nicer website) coming soon...</p>
+  <div class="row">
+    <!-- nav -->
+    <!-- TODO: drawer opens from left -->
+    <input type="checkbox" id="drawer-control" class="drawer">
+    <div class="col-sm-4 col-md-3 col-lg-2">
+      <label for="drawer-control" class="drawer-close"></label>
+      <a href="cardano/index.html" class="button">Cardano Stake Pool [PHL]</a>
+    </div>
+    <!-- content -->
+    <div class="col-sm-12 col-md-8 col-lg-9">
+      <!-- about -->
+      <div class="card fluid">
+        <h3 class="section">About</h3>
+        <div class="section">
+          PhillyStake is an organization of software developers providing value to Web3 networks and delegators.
+        </div>
+      </div>
+      <!-- TODO: hardware/infra -->
+    </div>
+  </div>
 </body>
 
 </html>
