@@ -182,7 +182,6 @@ kbd {
 pre {
   overflow: auto;
   background: var(--secondary-back-color);
-  padding: calc(1.5 * var(--universal-padding));
   margin: var(--universal-margin);
   border: 0.0625rem solid var(--secondary-border-color);
   border-left: 0.25rem solid var(--pre-color);
