@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="../mini-nord.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhillyStake Cardano [PHL]</title>
+</head>
+
+<body>
+  <header>
+    <label for="drawer-control" class="drawer-toggle"></label>
+    <a href="../index.html">
+      <img class="logo" src="../images/phillystake.svg" width="55rem" style="padding-bottom: 0rem;">
+    </a>
+    <a href="../index.html" class="logo" style="padding-left: 0rem;">PhillyStake</a>
+    <img src="../images/cardano.svg" alt="Cardano logo" style="height: 40%" />
+  </header>
+
+  <div class=" row">
+    <!-- nav -->
+    <input type="checkbox" id="drawer-control" class="drawer">
+    <div class="col-sm-4 col-md-3 col-lg-2">
+      <label for="drawer-control" class="drawer-close"></label>
+      <a href="../cardano/index.html" class="button">Cardano Stake Pool [PHL]</a>
+    </div>
+
+    <!-- content -->
+    <div class="col-sm-12 col-md-8 col-lg-6">
+      <h2>Creating a minimal Docker container for cardano-node</h2>
+      <p>theodus - 2021/09/25</p>
+      <hr><br>
+      <p>
+        Not all stake pool operators use Docker containers to deploy cardano-node, and that's great.
+        I think that a diverse set of infrastructure between pools is beneficial for the overall
+        robustness of the Cardano network. But for those that do, this can hoefully be a useful
+        reference. This could also be an additional reference for those that want to build the
+        cardano-node from source.
+        <br><br>
+        First things first, the Dockerfile described in this post is on the PhillyStake GitHub at
+        <a href="https://github.com/philly-stake/cardano-node">
+          github.com/philly-stake/cardano-node
+        </a>
+        and anyone can pull a public image of the container from Docker Hub at
+        <a href="https://hub.docker.com/r/theodus/cardano-node">
+          hub.docker.com/r/theodus/cardano-node
+        </a>
+        .
+        <br><br>
+        If you're unfamiliar with
+        <a href="https://docs.docker.com/get-started/overview/">Docker</a>
+        containers, they're a convenient way to package and deploy applications without having to
+        manage the dependencies of the application on the host where they will be running.
+        <br><br>
+        IOHK actually has their own Docker image, described in the
+        <a href="https://github.com/input-output-hk/cardano-node#docker-image">
+          cardano-node README
+        </a>
+        . But we at PhillyStake had some initial difficulties with it around the time we launched
+        our mainnet stake pool. So we just made our own! If you care about the details, read on.
+        <br><br>
+      </p>
+      <ol>
+        <li>
+          <p>
+            Start the build phase with the debian:latest base image. Also define the cardano-node,
+            GHC, and Cabal versions we'll be using.
+          </p>
+          <pre>
+  FROM debian:latest AS build
+
+  ARG VERSION="1.29.0"
+  ARG GHC_VERSION="8.10.7"
+  ARG CABAL_VERSION="3.6.0.0"
+          </pre>
+        </li>
+        <li>
+          <p>
+            Install all build dependencies and set the working directory to <code>/opt</code>.
+          </p>
+          <pre>
+  RUN apt-get update && apt-get install -y \
+    autoconf \
+    automake \
+    build-essential \
+    curl \
+    git \
+    libffi-dev \
+    libgmp-dev \
+    libssl-dev \
+    libtinfo-dev \
+    libsystemd-dev \
+    libncursesw5 \
+    libtool \
+    pkg-config \
+    zlib1g-dev
+
+  WORKDIR /opt
+          </pre>
+        </li>
+        <li>
+          <p>
+            Install Haskell & Cabal using <code>ghcup</code>.
+          </p>
+          <pre>
+  ENV BOOTSTRAP_HASKELL_NONINTERACTIVE=1
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+  ENV PATH=${PATH}:/root/.local/bin
+  ENV PATH=${PATH}:/root/.ghcup/bin
+  RUN ghcup upgrade && \
+    ghcup install ghc ${GHC_VERSION} && ghcup set ghc ${GHC_VERSION} && \
+    ghcup install cabal ${CABAL_VERSION} && ghcup set cabal ${CABAL_VERSION} && \
+    cabal update
+          </pre>
+        </li>
+        <li>
+          <p>
+            Build and install the required libsodium version.
+          </p>
+          <pre>
+  RUN git clone https://github.com/input-output-hk/libsodium \
+    && cd libsodium \
+    && git checkout 66f017f1 \
+    && ./autogen.sh \
+    && ./configure \
+    && make -j16 \
+    && make install
+  ENV LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
+  ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"
+          </pre>
+        </li>
+        <li>
+          <p>
+            Build and install <code>input-output-hk/cardano-node</code>
+          </p>
+          <pre>
+  RUN git clone https://github.com/input-output-hk/cardano-node.git \
+    && cd cardano-node \
+    && git fetch --all --recurse-submodules --tags \
+    && git tag && git checkout tags/${VERSION} \
+    && cabal configure --with-compiler=ghc-${GHC_VERSION} \
+    && echo "package cardano-crypto-praos" >>  cabal.project.local \
+    && echo "  flags: -external-libsodium-vrf" >>  cabal.project.local \
+    && cabal build -j16 all \
+    && mkdir /opt/bin/ \
+    && cp -p dist-newstyle/build/x86_64-linux/ghc-${GHC_VERSION}/cardano-node-${VERSION}/x/cardano-node/build/cardano-node/cardano-node /opt/bin/ \
+    && cp -p dist-newstyle/build/x86_64-linux/ghc-${GHC_VERSION}/cardano-cli-${VERSION}/x/cardano-cli/build/cardano-cli/cardano-cli /opt/bin/
+          </pre>
+        </li>
+        <li>
+          <p>
+            Create a new minimal container and define the user for this container.
+          </p>
+          <pre>
+  FROM debian:bullseye-slim
+
+  ARG USERNAME="cardano"
+  ARG USERID="1000"
+  ARG GROUPID="1024"
+          </pre>
+        </li>
+        <li>
+          <p>
+            Copy and install the created executable and necessary
+            libraries from the build stage.
+          </p>
+          <pre>
+  COPY --from=build /usr/local/lib/libsodium.so* /usr/local/lib/
+  COPY --from=build /opt/bin/cardano-cli /usr/local/bin/
+  COPY --from=build /opt/bin/cardano-node /usr/local/bin/
+
+  ENV LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
+          </pre>
+        </li>
+        <li>
+          <p>
+            Install the remaining dependencies for running cardano-node.
+          </p>
+          <pre>
+  RUN apt-get update && apt-get install -y --no-install-recommends \
+    netbase \
+    libc-dev \
+    && rm -rf /var/lib/apt/lists/*
+          </pre>
+        </li>
+        <li>
+          <p>
+            Create the user.
+          </p>
+          <pre>
+  RUN groupadd -g ${GROUPID} -r ${USERNAME} \
+    && useradd --no-log-init -r --gid ${GROUPID} -u ${USERID} ${USERNAME} \
+    && mkdir /home/${USERNAME} \
+    && chown -R ${USERID}:${GROUPID} /home/${USERNAME} \
+    && echo ${USERNAME}:${USERNAME} | chpasswd
+
+  USER ${USERNAME}
+          </pre>
+        </li>
+        <li>
+          <p>
+            Set the entrypoint.
+          </p>
+          <pre>
+  ENTRYPOINT ["cardano-node"]
+          </pre>
+        </li>
+      </ol>
+      <p>
+        <br>
+        Now that we've defined the Docker container, here's an example for running the cardano-node
+        within the container. This assumes all configuration files are placed in
+        <code>/var/lib/cardano</code> on the host with appropriate permissions for the cardano user
+        (UID 1000, GID 1024).
+      <pre>
+  docker run --rm --name cardano-node \
+    -v /var/lib/cardano:/home/cardano/ \
+    -p 3000:3000 \
+    -p 12798:12798 \
+    theodus/cardano-node run \
+      --host-addr 0.0.0.0 \
+      --port 3000 \
+      --database-path /home/cardano/cardano-node/db/ \
+      --socket-path /home/cardano/cardano-node/db/node.socket \
+      --config /home/cardano/cardano-node/mainnet-config.json \
+      --topology /home/cardano/cardano-node/mainnet-topology.json
+      </pre>
+      </p>
+    </div>
+  </div>
+
+</body>
+
+</html>
