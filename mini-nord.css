@@ -1057,7 +1057,7 @@ button.large, [type="button"].large, [type="submit"].large, [type="reset"].large
 }
 
 header {
-  height: 3.1875rem;
+  height: 3.2rem;
   background: var(--header-back-color);
   color: var(--header-fore-color);
   border-bottom: 0.0625rem solid var(--header-border-color);
